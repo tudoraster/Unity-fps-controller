@@ -13,8 +13,7 @@ public class PlayerMovement : MonoBehaviour
     public float sprintSpeed = 30f;
     public float crouchSpeed = 2.5f;
     public float slideSpeed = 35f;
-    private float slidingDuration = 1.5f;
-    private float airSpeed = 5f;
+    private float slidingDuration = 0.75f;
     public float jumpHeight = 10f;
     public float gravity = -9.81f;
 
@@ -22,34 +21,38 @@ public class PlayerMovement : MonoBehaviour
 
     //IsGround variables
     public Transform groundCheck;
-    public float groundDistance = 0.1f;
+    private float groundDistance = 0.4f;
     public LayerMask groundMask;
-
-    //CanUnCrouch variables
-    public Transform upCheck;
-    public LayerMask upMask;
 
     //Crouching variables
     Vector3 originalHeight;
-    Vector3 crouchingHeight = new Vector3(0, 0.75f, 0);
+    Vector3 crouchingHeight = new Vector3(1f, 0.75f, 1f);
 
-    void Start()
+    //Input
+    private float x;
+    private float z;
+
+    private void Start()
     {
         originalHeight = transform.localScale;
     }
 
-    void Update()
+    private void Update()
     {
         Movement();
-        StartCoroutine(SlideCrouchSprint());
+        Mechanics();
     }
 
-    //Checking if the player is currently sliding
+    //Check if character is sliding
     private bool IsSliding()
     {
-        if (IsSprinting() && IsCrouching())
+        if (Input.GetKey(KeyCode.LeftShift) && IsGrounded())
         {
-            return true;
+            if (Input.GetKey(KeyCode.LeftControl))
+            {
+                return true;
+            }
+            else { return false; }
         }
         else { return false; }
     }
@@ -68,70 +71,63 @@ public class PlayerMovement : MonoBehaviour
         else { return false; }
     }
 
-    //Crouching Sliding Sliding mechanics in one
-    IEnumerator SlideCrouchSprint()
+    //All mechanics into one method
+    private void Mechanics()
     {
-        moveSpeed = slideSpeed;
+        transform.localScale = originalHeight;
+        moveSpeed = walkSpeed;
 
-        if (IsSliding())
+        if (IsSprinting() && !IsCrouching())
         {
-            transform.localScale = crouchingHeight;
-
-            if (Input.GetButtonDown("Jump") && IsGrounded())
-            {
-                velocity.y = Mathf.Sqrt(jumpHeight * -2f * gravity);
-            }
-            if (!IsGrounded())
-            {
-                controller.Move(transform.forward * airSpeed * Time.deltaTime);
-            }
-
-            yield return new WaitForSeconds(slidingDuration);
-
-            if (IsCrouching())
-            {
-                moveSpeed = crouchSpeed;
-            }
-            else if (IsSprinting())
-            {
-                moveSpeed = sprintSpeed;
-            }
-            else
-            {
-                moveSpeed = crouchSpeed;
-            }
-        }
-        else if (IsSprinting())
-        {
-            moveSpeed = sprintSpeed;
-
-            transform.localScale = originalHeight;
-
             Sprint();
+            StopAllCoroutines();
         }
-        else if (IsCrouching())
+        else if(IsCrouching() && !IsSprinting())
         {
             Crouch();
+            StopAllCoroutines();
+        }
+        else if (IsSliding())
+        {
+            Slide();
+            StartCoroutine(StopSlide());
         }
         else
         {
-            moveSpeed = walkSpeed;
-
             transform.localScale = originalHeight;
+            moveSpeed = walkSpeed;
+            StopAllCoroutines();
+        }
+    }
+
+    //Stopping the slide after a specific number of seconds
+    IEnumerator StopSlide()
+    {
+        if (IsSliding())
+        {
+            yield return new WaitForSeconds(slidingDuration);
+
+            transform.localScale = crouchingHeight;
+            moveSpeed = crouchSpeed;
+        }
+    }
+
+    //Sliding mechanic
+    private void Slide()
+    {
+        if (IsSliding())
+        {
+            moveSpeed = slideSpeed;
+            transform.localScale = crouchingHeight;
         }
     }
 
     //Crouching mechanic
     private void Crouch()
     {
-        if (Input.GetKey(KeyCode.LeftControl) && !Input.GetKey(KeyCode.LeftShift))
+        if (IsCrouching())
         {
-            moveSpeed = crouchSpeed;
             transform.localScale = crouchingHeight;
-        }
-        else
-        {
-            transform.localScale = originalHeight;
             moveSpeed = crouchSpeed;
         }
     }
@@ -139,11 +135,11 @@ public class PlayerMovement : MonoBehaviour
     //Sprinting mechanic
     private void Sprint()
     {
-        if (Input.GetKey(KeyCode.LeftShift) && !Input.GetKey(KeyCode.LeftControl))
+        if (IsSprinting())
         {
+            transform.localScale = originalHeight;
             moveSpeed = sprintSpeed;
         }
-        else { moveSpeed = walkSpeed; }
     }
 
     //Check if isGrounded
@@ -155,8 +151,8 @@ public class PlayerMovement : MonoBehaviour
     //Movement
     private void Movement()
     {
-        float x = Input.GetAxis("Horizontal");
-        float z = Input.GetAxis("Vertical");
+        x = Input.GetAxis("Horizontal");
+        z = Input.GetAxis("Vertical");
 
         Vector3 move = transform.right * x + transform.forward * z;
 
